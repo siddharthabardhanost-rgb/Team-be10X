@@ -1,0 +1,6 @@
+{
+  "name": "Bunny Video Search & Player",
+  "description": "Search, preview and copy video links directly from Bunny Stream for the Product and Content teams.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

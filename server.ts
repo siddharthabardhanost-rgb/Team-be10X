@@ -103,7 +103,7 @@ app.get("/api/status", async (req, res) => {
       return res.json({ connected: false, message: "Missing API Key or Library ID in configuration." });
     }
 
-    const url = `https://video.bunnycdn.com/library/${libraryId}`;
+    const url = `https://video.bunnycdn.com/library/${libraryId}/videos?page=1&itemsPerPage=1`;
     const response = await fetch(url, {
       headers: {
         "AccessKey": apiKey,

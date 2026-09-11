@@ -9,25 +9,25 @@ const PORT = 3000;
 app.use(express.json());
 
 function getBunnyConfig(req: express.Request) {
-  const libraryId = (req.headers['x-bunny-library-id'] as string) || process.env.BUNNY_LIBRARY_ID || "";
-  const apiKey = (req.headers['x-bunny-access-key'] as string) || process.env.BUNNY_API_KEY || "";
-  const tokenKey = (req.headers['x-bunny-token-key'] as string) || process.env.BUNNY_TOKEN_KEY || "";
-  const cdnHostname = (req.headers['x-bunny-cdn-hostname'] as string) || process.env.BUNNY_CDN_HOSTNAME || "video.bunnycdn.com";
+  const libraryId = ((req.headers['x-bunny-library-id'] as string) || process.env.BUNNY_LIBRARY_ID || "").trim();
+  const apiKey = ((req.headers['x-bunny-access-key'] as string) || process.env.BUNNY_API_KEY || "").trim();
+  const tokenKey = ((req.headers['x-bunny-token-key'] as string) || process.env.BUNNY_TOKEN_KEY || "").trim();
+  const cdnHostname = ((req.headers['x-bunny-cdn-hostname'] as string) || process.env.BUNNY_CDN_HOSTNAME || "video.bunnycdn.com").trim();
   return { libraryId, apiKey, tokenKey, cdnHostname };
 }
 
 function generateTokens(videoId: string, tokenKey: string) {
   if (!tokenKey) return "";
   
-  // Expiration: 24 hours from now
-  const expires = Math.floor(Date.now() / 1000) + 86400;
-  
-  // Embed token hash: sha256(securityKey + videoId + expires)
-  const hash = crypto.createHash("sha256");
-  hash.update(tokenKey + videoId + expires);
-  const token = hash.digest("hex");
-  
-  return `?token=${token}&expires=${expires}`;
+  try {
+    const expires = Math.floor(Date.now() / 1000) + 86400;
+    const hash = crypto.createHash("sha256");
+    hash.update(tokenKey + videoId + expires);
+    const token = hash.digest("hex");
+    return `?token=${token}&expires=${expires}`;
+  } catch (e) {
+    return "";
+  }
 }
 
 // Search videos
@@ -46,74 +46,79 @@ app.get("/api/videos", async (req, res) => {
 
     // Try primary endpoint: video.bunnycdn.com
     if (effectiveLibraryId) {
-      const url = new URL(`https://video.bunnycdn.com/library/${effectiveLibraryId}/videos`);
-      url.searchParams.append("page", String(page));
-      url.searchParams.append("itemsPerPage", String(itemsPerPage));
-      url.searchParams.append("orderBy", String(orderBy));
-      if (search) {
-        url.searchParams.append("search", String(search));
-      }
-
-      response = await fetch(url.toString(), {
-        headers: {
-          "AccessKey": apiKey,
-          "Accept": "application/json"
+      try {
+        const url = new URL(`https://video.bunnycdn.com/library/${effectiveLibraryId}/videos`);
+        url.searchParams.append("page", String(page));
+        url.searchParams.append("itemsPerPage", String(itemsPerPage));
+        url.searchParams.append("orderBy", String(orderBy));
+        if (search) {
+          url.searchParams.append("search", String(search));
         }
-      });
+
+        response = await fetch(url.toString(), {
+          headers: {
+            "AccessKey": apiKey,
+            "Accept": "application/json"
+          }
+        });
+      } catch (e) {
+        // network or URL error, will try fallback list
+      }
     }
 
     // If 404 or missing libraryId, try listing libraries via api.bunny.net/videolibrary
     if (!response || response.status === 404 || !effectiveLibraryId) {
-      const listUrl = `https://api.bunny.net/videolibrary`;
-      const listRes = await fetch(listUrl, {
-        headers: {
-          "AccessKey": apiKey,
-          "Accept": "application/json"
-        }
-      });
-
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const libraries = listData.items || listData || [];
-        if (Array.isArray(libraries) && libraries.length > 0) {
-          // If libraryId was given, try to find matching one, otherwise take first
-          const matched = effectiveLibraryId 
-            ? libraries.find((l: any) => String(l.Id || l.id) === String(effectiveLibraryId))
-            : libraries[0];
-          
-          const targetLib = matched || libraries[0];
-          effectiveLibraryId = String(targetLib.Id || targetLib.id);
-
-          // Now fetch videos from that library
-          const url2 = new URL(`https://video.bunnycdn.com/library/${effectiveLibraryId}/videos`);
-          url2.searchParams.append("page", String(page));
-          url2.searchParams.append("itemsPerPage", String(itemsPerPage));
-          url2.searchParams.append("orderBy", String(orderBy));
-          if (search) {
-            url2.searchParams.append("search", String(search));
+      try {
+        const listUrl = `https://api.bunny.net/videolibrary`;
+        const listRes = await fetch(listUrl, {
+          headers: {
+            "AccessKey": apiKey,
+            "Accept": "application/json"
           }
+        });
 
-          response = await fetch(url2.toString(), {
-            headers: {
-              "AccessKey": apiKey,
-              "Accept": "application/json"
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          const libraries = listData.items || listData || [];
+          if (Array.isArray(libraries) && libraries.length > 0) {
+            const matched = effectiveLibraryId 
+              ? libraries.find((l: any) => String(l.Id || l.id) === String(effectiveLibraryId))
+              : libraries[0];
+            
+            const targetLib = matched || libraries[0];
+            effectiveLibraryId = String(targetLib.Id || targetLib.id);
+
+            const url2 = new URL(`https://video.bunnycdn.com/library/${effectiveLibraryId}/videos`);
+            url2.searchParams.append("page", String(page));
+            url2.searchParams.append("itemsPerPage", String(itemsPerPage));
+            url2.searchParams.append("orderBy", String(orderBy));
+            if (search) {
+              url2.searchParams.append("search", String(search));
             }
-          });
+
+            response = await fetch(url2.toString(), {
+              headers: {
+                "AccessKey": apiKey,
+                "Accept": "application/json"
+              }
+            });
+          }
         }
+      } catch (e) {
+        // fallback error
       }
     }
 
     if (!response || !response.ok) {
       const status = response ? response.status : 400;
-      if (status === 401) {
-        return res.status(401).json({ error: "Unable to authenticate with Bunny. Please check your API Key and Library ID." });
+      if (status === 401 || status === 403) {
+        return res.status(401).json({ error: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." });
       }
       return res.status(status).json({ error: `Bunny API error (${status}): Please verify your Library ID and API Key.` });
     }
 
     data = await response.json();
     
-    // Process items to construct URLs
     const items = (data.items || []).map((video: any) => {
       const authQuery = generateTokens(video.guid, tokenKey);
       const host = cdnHostname === 'video.bunnycdn.com' ? 'vz-' + effectiveLibraryId + '.b-cdn.net' : cdnHostname;
@@ -134,14 +139,14 @@ app.get("/api/videos", async (req, res) => {
       };
     });
 
-    res.json({
+    return res.json({
       ...data,
       libraryId: effectiveLibraryId,
       items
     });
     
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Internal server error" });
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
 });
 
@@ -150,7 +155,11 @@ app.get("/api/status", async (req, res) => {
   try {
     const { libraryId, apiKey } = getBunnyConfig(req);
     if (!apiKey) {
-      return res.status(400).json({ connected: false, message: "Missing API Key in configuration." });
+      return res.status(400).json({ 
+        success: false, 
+        connected: false, 
+        message: "Missing API Key in configuration." 
+      });
     }
 
     let success = false;
@@ -158,43 +167,76 @@ app.get("/api/status", async (req, res) => {
 
     // Test via video library videos endpoint
     if (libraryId) {
-      const url = `https://video.bunnycdn.com/library/${libraryId}/videos?page=1&itemsPerPage=1`;
-      const response = await fetch(url, {
-        headers: {
-          "AccessKey": apiKey,
-          "Accept": "application/json"
+      try {
+        const url = `https://video.bunnycdn.com/library/${libraryId}/videos?page=1&itemsPerPage=1`;
+        const response = await fetch(url, {
+          headers: {
+            "AccessKey": apiKey,
+            "Accept": "application/json"
+          }
+        });
+        if (response.ok) {
+          success = true;
+          message = "Bunny Stream connection successful.";
+        } else if (response.status === 401 || response.status === 403) {
+          return res.status(401).json({ 
+            success: false, 
+            connected: false, 
+            message: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." 
+          });
         }
-      });
-      if (response.ok) {
-        success = true;
-        message = "Bunny Stream connection successful.";
-      } else if (response.status === 401 || response.status === 403) {
-        return res.status(401).json({ connected: false, message: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." });
+      } catch (e) {
+        // ignore and try fallback
       }
     }
 
     // If not successful yet, test via api.bunny.net/videolibrary
     if (!success) {
-      const listUrl = `https://api.bunny.net/videolibrary`;
-      const listRes = await fetch(listUrl, {
-        headers: {
-          "AccessKey": apiKey,
-          "Accept": "application/json"
+      try {
+        const listUrl = `https://api.bunny.net/videolibrary`;
+        const listRes = await fetch(listUrl, {
+          headers: {
+            "AccessKey": apiKey,
+            "Accept": "application/json"
+          }
+        });
+        if (listRes.ok) {
+          success = true;
+          message = "Bunny Stream connection successful.";
+        } else if (listRes.status === 401 || listRes.status === 403) {
+          return res.status(401).json({ 
+            success: false, 
+            connected: false, 
+            message: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." 
+          });
+        } else {
+          message = "Bunny Stream authentication failed. Please check your Library ID and API Access Key.";
         }
-      });
-      if (listRes.ok) {
-        success = true;
-        message = "Bunny Stream connection successful.";
-      } else if (listRes.status === 401 || listRes.status === 403) {
-        return res.status(401).json({ connected: false, message: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." });
-      } else {
+      } catch (e) {
         message = "Bunny Stream authentication failed. Please check your Library ID and API Access Key.";
       }
     }
 
-    res.json({ connected: success, message });
+    if (success) {
+      return res.json({ 
+        success: true, 
+        connected: true, 
+        message: "Bunny Stream connection successful." 
+      });
+    } else {
+      return res.status(401).json({ 
+        success: false, 
+        connected: false, 
+        message: message || "Bunny Stream authentication failed. Please check your Library ID and API Access Key." 
+      });
+    }
   } catch (err: any) {
-    res.status(500).json({ connected: false, message: err.message || "Error connecting to Bunny API." });
+    return res.status(500).json({ 
+      success: false, 
+      connected: false, 
+      message: "Unable to connect to Bunny Stream.", 
+      error: "Internal server error during connection test" 
+    });
   }
 });
 

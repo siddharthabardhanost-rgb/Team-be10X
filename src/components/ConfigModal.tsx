@@ -42,21 +42,37 @@ export default function ConfigModal({ onClose }: Props) {
   };
 
   const testConnection = async () => {
+    const trimmedLibId = libraryId.trim();
+    const trimmedApiKey = apiKey.trim();
+
+    if (!trimmedApiKey) {
+      setStatus('error');
+      setMessage('Please enter your Bunny API Access Key.');
+      return;
+    }
+
     setStatus('testing');
     setMessage('');
     try {
-      const data = await safeFetch('/api/status');
+      const data = await safeFetch('/api/status', {
+        headers: {
+          'x-bunny-library-id': trimmedLibId,
+          'x-bunny-access-key': trimmedApiKey,
+          'x-bunny-token-key': tokenKey.trim(),
+          'x-bunny-cdn-hostname': cdnHostname.trim(),
+        }
+      });
       
-      if (data.connected) {
+      if (data.success || data.connected) {
         setStatus('success');
-        setMessage(data.message);
+        setMessage(data.message || 'Bunny Stream connection successful.');
       } else {
         setStatus('error');
-        setMessage(data.message || 'Unable to authenticate with Bunny.');
+        setMessage(data.message || 'Bunny Stream authentication failed. Please check your Library ID and API Access Key.');
       }
     } catch (err: any) {
       setStatus('error');
-      setMessage(err.message || 'Failed to reach the server to test connection.');
+      setMessage(err.message || 'Bunny connection service is unavailable. Please try again.');
     }
   };
 

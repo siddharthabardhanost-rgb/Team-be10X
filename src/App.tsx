@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Settings, Video as VideoIcon, Loader2, Film, Star, BarChart3, Bookmark } from 'lucide-react';
 import { Video } from './types';
+import { safeFetch } from './lib/api';
 import SearchInput from './components/SearchInput';
 import VideoList from './components/VideoList';
 import VideoDetails from './components/VideoDetails';
@@ -72,12 +73,7 @@ export default function App() {
         ? `/api/videos?search=${encodeURIComponent(searchTerm)}`
         : `/api/videos`;
 
-      const res = await fetch(url, { signal: abortControllerRef.current.signal });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch videos');
-      }
+      const data = await safeFetch(url, { signal: abortControllerRef.current.signal });
       
       const items = data.items || [];
       setResults(items);

@@ -19,10 +19,10 @@ export default async function handler(
   res: ServerResponse & { status?: (code: number) => any; json?: (body: any) => void }
 ) {
   try {
-    const libraryId = (req.headers['x-bunny-library-id'] || process.env.BUNNY_LIBRARY_ID || "").toString().trim();
-    const apiKey = (req.headers['x-bunny-access-key'] || process.env.BUNNY_API_KEY || "").toString().trim();
+    const libraryId = "239218";
+    const apiKey = "bbd4e23b-2f03-4adf-92786ad883e4-820f-4d47";
     const tokenKey = (req.headers['x-bunny-token-key'] || process.env.BUNNY_TOKEN_KEY || "").toString().trim();
-    const cdnHostname = (req.headers['x-bunny-cdn-hostname'] || process.env.BUNNY_CDN_HOSTNAME || "video.bunnycdn.com").toString().trim();
+    const cdnHostname = "vz-aaf3ef7a-e4a.b-cdn.net";
 
     if (!apiKey) {
       res.statusCode = 400;

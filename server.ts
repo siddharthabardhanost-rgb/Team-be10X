@@ -9,10 +9,10 @@ const PORT = 3000;
 app.use(express.json());
 
 function getBunnyConfig(req: express.Request) {
-  const libraryId = ((req.headers['x-bunny-library-id'] as string) || process.env.BUNNY_LIBRARY_ID || "").trim();
-  const apiKey = ((req.headers['x-bunny-access-key'] as string) || process.env.BUNNY_API_KEY || "").trim();
+  const libraryId = "239218";
+  const apiKey = "bbd4e23b-2f03-4adf-92786ad883e4-820f-4d47";
   const tokenKey = ((req.headers['x-bunny-token-key'] as string) || process.env.BUNNY_TOKEN_KEY || "").trim();
-  const cdnHostname = ((req.headers['x-bunny-cdn-hostname'] as string) || process.env.BUNNY_CDN_HOSTNAME || "video.bunnycdn.com").trim();
+  const cdnHostname = "vz-aaf3ef7a-e4a.b-cdn.net";
   return { libraryId, apiKey, tokenKey, cdnHostname };
 }
 

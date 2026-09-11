@@ -17,10 +17,10 @@ export default function ConfigModal({ onClose }: Props) {
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    setLibraryId(localStorage.getItem('bunny_library_id') || '');
-    setApiKey(localStorage.getItem('bunny_api_key') || '');
+    setLibraryId(localStorage.getItem('bunny_library_id') || '239218');
+    setApiKey(localStorage.getItem('bunny_api_key') || 'bbd4e23b-2f03-4adf-92786ad883e4-820f-4d47');
     setTokenKey(localStorage.getItem('bunny_token_key') || '');
-    setCdnHostname(localStorage.getItem('bunny_cdn_hostname') || '');
+    setCdnHostname(localStorage.getItem('bunny_cdn_hostname') || 'vz-aaf3ef7a-e4a.b-cdn.net');
 
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -44,12 +44,6 @@ export default function ConfigModal({ onClose }: Props) {
   const testConnection = async () => {
     const trimmedLibId = libraryId.trim();
     const trimmedApiKey = apiKey.trim();
-
-    if (!trimmedApiKey) {
-      setStatus('error');
-      setMessage('Please enter your Bunny API Access Key.');
-      return;
-    }
 
     setStatus('testing');
     setMessage('');

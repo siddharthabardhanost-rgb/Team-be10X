@@ -24,13 +24,22 @@ export async function safeFetch(url: string, options?: RequestInit) {
     },
   };
 
-  const res = await fetch(url, mergedOptions);
+  let res: Response;
+  try {
+    res = await fetch(url, mergedOptions);
+  } catch (err) {
+    throw new Error("Bunny connection service is unavailable. Please try again.");
+  }
+
   const text = await res.text();
   
   let data: any;
   try {
     data = JSON.parse(text);
   } catch (e) {
+    if (res.status === 404 || text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("NOT_FOUND")) {
+      throw new Error("Bunny connection service is unavailable. Please try again.");
+    }
     if (!res.ok) {
       throw new Error(`Server error (${res.status}): ${text.substring(0, 120)}`);
     }
@@ -38,6 +47,9 @@ export async function safeFetch(url: string, options?: RequestInit) {
   }
 
   if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Bunny connection service is unavailable. Please try again.");
+    }
     throw new Error(data.error || data.message || `Request failed with status ${res.status}`);
   }
 

@@ -150,7 +150,7 @@ app.get("/api/status", async (req, res) => {
   try {
     const { libraryId, apiKey } = getBunnyConfig(req);
     if (!apiKey) {
-      return res.json({ connected: false, message: "Missing API Key in configuration." });
+      return res.status(400).json({ connected: false, message: "Missing API Key in configuration." });
     }
 
     let success = false;
@@ -167,7 +167,9 @@ app.get("/api/status", async (req, res) => {
       });
       if (response.ok) {
         success = true;
-        message = "Bunny Stream connection successful!";
+        message = "Bunny Stream connection successful.";
+      } else if (response.status === 401 || response.status === 403) {
+        return res.status(401).json({ connected: false, message: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." });
       }
     }
 
@@ -181,23 +183,18 @@ app.get("/api/status", async (req, res) => {
         }
       });
       if (listRes.ok) {
-        const listData = await listRes.json();
-        const libs = listData.items || listData || [];
-        if (Array.isArray(libs) && libs.length > 0) {
-          success = true;
-          message = `Connected successfully! Found ${libs.length} video library(ies).`;
-        } else {
-          success = true;
-          message = "Connected successfully, but no video libraries found.";
-        }
+        success = true;
+        message = "Bunny Stream connection successful.";
+      } else if (listRes.status === 401 || listRes.status === 403) {
+        return res.status(401).json({ connected: false, message: "Bunny Stream authentication failed. Please check your Library ID and API Access Key." });
       } else {
-        message = "Unable to authenticate with Bunny. Please check your API Key and Library ID.";
+        message = "Bunny Stream authentication failed. Please check your Library ID and API Access Key.";
       }
     }
 
     res.json({ connected: success, message });
   } catch (err: any) {
-    res.json({ connected: false, message: err.message || "Error connecting to Bunny API." });
+    res.status(500).json({ connected: false, message: err.message || "Error connecting to Bunny API." });
   }
 });
 
@@ -221,4 +218,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.VERCEL !== "1") {
+  startServer();
+}
+
+export default app;
